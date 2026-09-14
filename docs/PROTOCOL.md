@@ -128,11 +128,15 @@ The serial implementation is designed not to dominate stepper servicing:
 
 ## Host integration
 
-The firmware does not require a specific desktop plugin. Any program capable of obtaining simulator telemetry and writing the protocol above to a serial port can drive the controller.
+The firmware does not require a specific simulator plugin. Any program capable of obtaining simulator telemetry and writing the protocol above to a serial port can drive the controller.
+
+For X-Plane 12, this repository includes `xplane/PI_CockpitGaugeController.py`, an XPPython3 bridge that reads the required X-Plane DataRefs and emits complete frames at 20 Hz by default. See [X-Plane integration](XPLANE.md).
 
 A host adapter should:
 
 1. Open the Arduino serial port at 115200 baud.
 2. Send newline-terminated frames.
 3. Prefer a stable update cadence rather than unbounded serial flooding.
-4. Send `PARK` before an intentional controller power-down when possible.
+4. Continuously read/drain controller output if the serial port remains open.
+5. Send `RESUME` after reconnecting if the controller may have been parked.
+6. Send `PARK` before an intentional controller power-down when possible.

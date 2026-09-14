@@ -14,3 +14,7 @@ build/
 # Local logs / captures
 *.log
 *.csv
+
+# Python / XPPython3
+__pycache__/
+*.py[cod]

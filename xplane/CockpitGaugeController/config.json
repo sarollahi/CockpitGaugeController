@@ -1,0 +1,10 @@
+{
+  "serial_port": "auto",
+  "baud_rate": 115200,
+  "update_hz": 20.0,
+  "reconnect_interval_s": 2.0,
+  "arduino_reset_delay_s": 2.0,
+  "park_on_plugin_disable": true,
+  "send_resume_on_connect": true,
+  "log_controller_messages": false
+}

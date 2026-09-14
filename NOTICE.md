@@ -40,3 +40,12 @@ The X-Plane bridge integrates with third-party software that is not vendored in 
 - pyserial
 
 Users should obtain XPPython3 from its official distribution and consult the upstream projects for their respective licenses and notices.
+
+## Microsoft Flight Simulator bridge dependencies
+
+The optional MSFS bridge uses external Python packages that are not vendored into this repository:
+
+- `pysimconnect` by Patrick Surry — MIT License — https://github.com/patricksurry/pysimconnect
+- `pyserial` — BSD-3-Clause License — https://github.com/pyserial/pyserial
+
+Microsoft Flight Simulator and SimConnect are Microsoft products/APIs and are not redistributed by this repository. The bridge communicates with SimConnect through the external wrapper dependency.

@@ -31,3 +31,12 @@ This project depends on third-party Arduino libraries, including:
 - Adafruit ST7735 and ST7789 Library
 
 Those libraries are not vendored into this repository and remain subject to their own licenses and copyright notices.
+
+## Optional X-Plane integration dependencies
+
+The X-Plane bridge integrates with third-party software that is not vendored in this repository:
+
+- XPPython3 by Peter Buckner / AvnWx.com
+- pyserial
+
+Users should obtain XPPython3 from its official distribution and consult the upstream projects for their respective licenses and notices.

@@ -1,0 +1,16 @@
+{
+  "serial_port": "auto",
+  "baud_rate": 115200,
+  "update_hz": 20.0,
+  "simconnect_reconnect_interval_s": 2.0,
+  "serial_reconnect_interval_s": 2.0,
+  "arduino_reset_delay_s": 2.0,
+  "send_resume_on_connect": true,
+  "park_on_exit": true,
+  "park_wait_timeout_s": 10.0,
+  "log_controller_messages": false,
+  "turn_invert": false,
+  "slip_invert": false,
+  "slip_full_scale_input_deg": 4.0,
+  "simconnect_dll": "auto"
+}

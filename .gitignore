@@ -1,0 +1,16 @@
+# Arduino / PlatformIO build output
+build/
+.pio/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Local logs / captures
+*.log
+*.csv

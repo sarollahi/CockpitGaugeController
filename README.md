@@ -8,7 +8,7 @@
 
 Robust Arduino Mega 2560 firmware for driving a physical flight-simulator instrument cluster with eight stepper-controlled axes, local calibration controls, a TFT status display, persistent calibration, and software-only position recovery.
 
-The firmware deliberately keeps the simulator-facing side simple: a host application sends human-readable telemetry over serial, while the Arduino handles motion, filtering, calibration, position tracking, parking, and recovery. This keeps the gauge controller independent from any one simulator plugin or desktop stack.
+The Arduino firmware deliberately keeps the simulator-facing side simple: a host adapter sends human-readable telemetry over serial, while the Mega handles motion, filtering, calibration, position tracking, parking, and recovery. For X-Plane 12, the repository now includes a native **XPPython3 bridge** that reads standard DataRefs and streams them directly to the controller over USB serial. **XPLDirect is not required.** The serial protocol remains simulator-independent, so other simulators can use their own adapters without changing the firmware.
 
 > **Current scope:** airspeed, turn rate, slip, altimeter, barometric setting, directional gyro, heading bug, and vertical speed.
 
@@ -16,6 +16,7 @@ The firmware deliberately keeps the simulator-facing side simple: a host applica
 
 | Area | Implementation |
 | --- | --- |
+| X-Plane integration | Included XPPython3 bridge; no XPLDirect dependency |
 | Gauge control | 8 independent `AccelStepper` axes |
 | Motion servicing | Non-blocking stepper service on every main-loop pass |
 | Control timing | Fixed 50 Hz measurement/filter/target loop |
@@ -54,7 +55,9 @@ The firmware separates work that must run frequently from work that should run a
 
 ```mermaid
 flowchart LR
-    HOST[Simulator / host bridge] -->|115200 baud serial| RX[Bounded serial parser]
+    XP[X-Plane 12] -->|standard DataRefs| BRIDGE[XPPython3 bridge]
+    OTHER[Other simulator / host adapter] -->|ASCII protocol| RX[Bounded serial parser]
+    BRIDGE -->|115200 baud USB serial| RX
     BTN[Select / CW / CCW buttons] --> CAL[Calibration logic]
     TFT[TFT status display] <--> CAL
     RX --> FILTER[50 Hz filtering + state update]
@@ -68,6 +71,41 @@ flowchart LR
 ```
 
 `AccelStepper::run()` remains in the unrestricted main loop so serial parsing, display work, EEPROM writes, and button handling do not become the motor timing clock. Filtering and target calculation run at a fixed 20 ms interval, so smoothing behavior does not change with CPU load.
+
+## X-Plane 12 integration
+
+The repository includes `xplane/PI_CockpitGaugeController.py`, a native bridge for [XPPython3](https://xppython3.readthedocs.io/). The bridge runs inside X-Plane, reads the instrument DataRefs required by the current eight axes, and sends a complete telemetry frame to the Arduino at 20 Hz by default.
+
+```text
+X-Plane 12
+    |
+    | DataRefs
+    v
+XPPython3 + PI_CockpitGaugeController.py
+    |
+    | USB serial @ 115200
+    v
+Arduino Mega 2560
+    |
+    v
+physical gauges
+```
+
+The bridge includes:
+
+- Arduino/Mega-oriented serial auto-detection with explicit-port fallback.
+- Automatic reconnect after USB disconnects or device loss.
+- Arduino reset delay after opening the serial port.
+- Continuous draining of controller output so Arduino TX logging cannot back-pressure the firmware.
+- Short serial write timeouts so a failed USB link does not indefinitely block X-Plane's flight loop.
+- Automatic `RESUME` after connecting.
+- Optional `PARK` when the XPPython3 plugin is disabled.
+- Automatic request to install `pyserial` through XPPython3 when the module is missing.
+- JSON configuration for port, update frequency, reconnect timing, reset delay, shutdown behavior, and controller logging.
+
+The bridge reads these standard X-Plane values: IAS, turn indication, slip, altitude, barometric setting, magnetic heading, heading bug, and vertical speed. The Arduino still owns all mechanism-specific mapping and filtering.
+
+See [X-Plane integration](docs/XPLANE.md) for installation, configuration, DataRefs, and troubleshooting.
 
 ## Position recovery without homing sensors
 
@@ -188,6 +226,8 @@ For the complete map, see [Wiring](docs/WIRING.md).
 
 ## Software dependencies
 
+### Arduino firmware
+
 Install these Arduino libraries:
 
 - [AccelStepper](https://www.airspayce.com/mikem/arduino/AccelStepper/)
@@ -195,6 +235,15 @@ Install these Arduino libraries:
 - [Adafruit ST7735 and ST7789 Library](https://github.com/adafruit/Adafruit-ST7735-Library)
 
 The firmware also uses Arduino core libraries `SPI` and `EEPROM`.
+
+### X-Plane bridge
+
+For the included X-Plane 12 adapter:
+
+- [XPPython3](https://xppython3.readthedocs.io/) 4.x
+- `pyserial>=3.5`
+
+`pyserial` is not vendored. If it is missing, the plugin uses XPPython3's package helper to request installation into XPPython3's own Python environment. XPPython3 itself is not redistributed by this repository.
 
 ## Build and upload
 
@@ -205,6 +254,17 @@ The firmware also uses Arduino core libraries `SPI` and `EEPROM`.
 5. Compile and upload.
 6. Open a serial connection at **115200 baud**.
 7. Check `POS:STATUS` before relying on a restored position after changing hardware or manually rotating a gauge.
+
+## Connect to X-Plane 12
+
+1. Install XPPython3 into X-Plane.
+2. Copy `xplane/PI_CockpitGaugeController.py` and the `xplane/CockpitGaugeController/` folder into `Resources/plugins/PythonPlugins/`.
+3. Connect the Arduino Mega over USB.
+4. Start X-Plane.
+5. If XPPython3 installs `pyserial` on the first run, reload XPPython3 plugins or restart X-Plane once installation finishes.
+6. The default configuration auto-detects the Arduino and begins sending data at 20 Hz.
+
+If auto-detection cannot uniquely identify the controller, edit `xplane/CockpitGaugeController/config.json` and set an explicit serial port. See [X-Plane integration](docs/XPLANE.md).
 
 ## First calibration
 
@@ -271,22 +331,6 @@ Several implementation choices are intentional:
 - BARO has independent speed/acceleration limits.
 - DG/BUG heading smoothing is wrap-safe.
 
-## Repository layout
-
-```text
-CockpitGaugeController/
-├── firmware/
-│   └── CockpitGaugeController/
-│       └── CockpitGaugeController.ino
-├── docs/
-│   ├── CALIBRATION.md
-│   ├── PROTOCOL.md
-│   └── WIRING.md
-├── NOTICE.md
-├── LICENSE
-└── README.md
-```
-
 ## Mechanical design credit
 
 The physical gauge mechanisms and 3D-printable instrument designs used as the basis for this build are based on work by **Martin Rusk** in the [MartinRusk/Sixpack](https://github.com/MartinRusk/Sixpack) project and its associated Printables models.
@@ -303,6 +347,27 @@ Relevant original physical designs include:
 
 See [NOTICE.md](NOTICE.md) for attribution details. The original 3D files are not redistributed here; their own licenses remain with their respective authors/pages.
 
+## Repository layout
+
+```text
+CockpitGaugeController/
+├── firmware/
+│   └── CockpitGaugeController/
+│       └── CockpitGaugeController.ino
+├── xplane/
+│   ├── PI_CockpitGaugeController.py
+│   └── CockpitGaugeController/
+│       └── config.json
+├── docs/
+│   ├── WIRING.md
+│   ├── PROTOCOL.md
+│   ├── CALIBRATION.md
+│   └── XPLANE.md
+├── NOTICE.md
+├── LICENSE
+└── README.md
+```
+
 ## License
 
 The firmware and original documentation in this repository are released under **GNU GPL v2.0 only**. See [LICENSE](LICENSE).
@@ -311,4 +376,4 @@ This choice is compatible with the open-source licensing model of the AccelStepp
 
 ## Status
 
-The current firmware targets an Arduino Mega 2560 and the existing eight-axis hardware layout. The serial boundary is intentionally simple enough that a host bridge can be written for X-Plane or another simulator without changing the motor-control architecture.
+The current firmware targets an Arduino Mega 2560 and the existing eight-axis hardware layout. X-Plane 12 integration is included through XPPython3, while the serial boundary remains intentionally simple so adapters for other simulators can be added without changing the motor-control architecture.
